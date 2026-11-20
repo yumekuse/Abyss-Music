@@ -16,6 +16,8 @@ use tokio::sync::OnceCell;
 #[derive(Debug)]
 pub enum UserEvent {
     Eval(String),
+    /// messages from the page (window.ipc.postMessage): drag / minimize / close / mode:{...}
+    Ipc(String),
     Focus,
     Quit,
 }
@@ -82,6 +84,10 @@ impl App {
                 app.store_flush();
             });
         }
+    }
+    pub fn store_set_now(&self, k: &str, v: Value) {
+        self.store.lock().unwrap().insert(k.to_string(), v);
+        self.store_dirty.store(true, Ordering::SeqCst);
     }
     pub fn store_flush(&self) {
         self.store_dirty.store(false, Ordering::SeqCst);

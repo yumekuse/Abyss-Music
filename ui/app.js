@@ -355,6 +355,7 @@ const topbar = () => `<header class="top">
   <label class="srch">${I.search}<input id="tbq" placeholder="search anything" value="${esc(S.q)}" autocomplete="off" spellcheck="false">${S.q ? `<button class="x" data-act="clears" title="clear">${I.x}</button>` : ""}</label>
   <div class="top-r">
     <button class="obtn ${S.discord && S.discordOk ? "" : "off"}" data-act="discord" title="Discord status"><span class="sq"></span><span class="t">${S.discord && S.discordOk ? "discord" : "discord off"}</span></button>
+    <button class="ibtn" data-act="mini-on" title="mini player (ctrl+m)">${I.mini}</button>
     <button class="ibtn ${S.page === "settings" ? "on" : ""}" data-act="go" data-p="settings" title="settings">${I.gear}</button>
     <span class="avatar ${S.signedIn ? "in" : ""}" data-act="${S.signedIn ? "go" : "signin"}" data-p="settings" title="${S.signedIn ? esc(S.account?.name || "account") : "sign in with google"}">${S.account?.photo ? `<img src="${esc(S.account.photo)}" alt="" style="width:100%;height:100%;object-fit:cover" referrerpolicy="no-referrer">` : S.signedIn ? esc((S.account?.name || "y")[0].toLowerCase()) : "?"}</span>
   </div></header>`;
@@ -827,6 +828,8 @@ P.settings = () => `<div class="phead"><div class="h1">settings.</div></div>
     <div class="srow"><div><b>no ads</b><small>always. abyss never plays ads.</small></div><span class="caps">always on</span></div>
     <div class="srow"><div><b>smooth transitions</b><small>fade one song into the next so there's no silence between them.</small></div><div class="seg">${[[0, "off"], [2, "2s"], [5, "5s"], [7, "7s"], [12, "12s"]].map(([v, n]) => `<button class="${S.crossfade === v ? "on" : ""}" data-act="xfade" data-v="${v}">${n}</button>`).join("")}</div></div>
     <div class="srow"><div><b>speed</b><small>play songs slower or faster (pitch stays the same).</small></div><div class="seg">${[0.75, 1, 1.25, 1.5].map(v => `<button class="${S.speed === v ? "on" : ""}" data-act="speed" data-v="${v}">${v}×</button>`).join("")}</div></div>
+    <div class="srow"><div><b>mini player</b><small>a small old-school player (winamp style) with a skin for every theme. ctrl+m switches.</small></div><button class="obtn" data-act="mini-on">${I.mini}open mini player</button></div>
+    <div class="srow"><div><b>mini player stays on top</b><small>keep the mini player above other windows.</small></div>${sw(S.miniTop, "minitop")}</div>
     <div class="srow"><div><b>autoplay radio</b><small>keep playing similar songs when the queue ends.</small></div>${sw(S.autoplay, "auto")}</div>
     <div class="srow"><div><b>stream quality</b><small>${esc(streamQ || "plays at the best audio youtube gives this app (AAC ~128 kbps).")}</small></div><span class="caps">auto</span></div></div>
   <div class="sbox"><div class="h2">integrations</div>
@@ -892,6 +895,104 @@ function modal() {
   return "";
 }
 
+/* ================= mini player (winamp / aimp style) ================= */
+// window sizes (logical px); the app window is resized to exactly this
+const MINI_W = 520, MINI_H = 244, MINI_H_PL = 500;
+Object.assign(I, {
+  mini: sv('<rect x="3" y="5" width="18" height="14" rx="1"/><rect x="12" y="11" width="7" height="6" class="f"/>'),
+  stop: sv('<rect x="6" y="6" width="12" height="12"/>', 1),
+  winMin: sv('<path d="M6 17h12"/>'), winFull: sv('<rect x="5" y="5" width="14" height="14"/>'), pin: sv('<path d="M12 17v5M8 3h8l-1 6 3 4H6l3-4z"/>'),
+});
+S.mini = store.get("mini", false); S.miniPL = store.get("miniPL", false); S.miniTop = store.get("miniTop", true); S.miniRemain = false;
+// skin per theme: cream = aimp modern, dark = classic winamp, vice = red winamp, sakura = pink, latte = bronze, white = silver lcd
+const SKINS = { cream: ["aimp", "abyss modern"], dark: ["winamp", "abyss classic"], vice: ["vice", "abyss inferno"], sakura: ["sakura", "abyss sakura"], latte: ["latte", "abyss bronze"], white: ["silver", "abyss silver"], custom: ["custom", "abyss custom"] };
+const winMsg = m => { try { window.ipc && window.ipc.postMessage(m); } catch {} };
+const miniSize = () => ({ mini: S.mini, w: MINI_W, h: S.miniPL ? MINI_H_PL : MINI_H, onTop: S.miniTop });
+function setMini(on) {
+  S.mini = !!on; store.set("mini", S.mini);
+  winMsg("mode:" + JSON.stringify(miniSize()));
+  render(true);
+  if (S.mini) setTimeout(scrollPL, 30);
+}
+const scrollPL = () => { const l = document.querySelector(".mpl .mlist"), c = l && l.querySelector(".cur"); if (c) l.scrollTop = c.offsetTop - l.clientHeight / 2 + c.offsetHeight / 2; };
+const totalTime = list => { const s = list.reduce((a, t) => a + (t.dur || 0), 0), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = Math.floor(s % 60); return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(x).padStart(2, "0"); };
+
+function miniView() {
+  const t = cur(), [skin, skinName] = SKINS[S.theme] || SKINS.cream;
+  const text = t ? `${t.artist ? t.artist + " - " : ""}${t.title}${t.album ? " (" + t.album + ")" : ""}  ✦  ${fmt(t.dur || S.dur) || "--:--"}  ✦  ` : "abyss  ✦  pick a song in the full player  ✦  no ads ever  ✦  ";
+  const speed = Math.max(8, text.length * 0.22);
+  const spec = Array.from({ length: 22 }, () => "<i></i>").join("");
+  const pos = S.queue.length ? `${S.idx + 1}/${S.queue.length}` : "0/0";
+  return `<div class="mini skin-${skin} ${S.playing ? "playing" : ""}" style="${t?.thumb ? `--cover:url('${esc(t.thumb)}')` : ""}">
+    <div class="mtitle" title="drag to move · double-click for the full player">
+      <span class="mgrip"></span><span class="mname">${esc(skinName)}</span><span class="mgrip"></span>
+      <div class="mwin"><button data-act="mpin" class="${S.miniTop ? "on" : ""}" title="${S.miniTop ? "stays on top (click to let go)" : "keep on top"}">${I.pin}</button><button data-act="mmin" title="minimize">${I.winMin}</button><button data-act="mini-off" title="full player (ctrl+m)">${I.winFull}</button><button data-act="mclose" title="close abyss">${I.x}</button></div>
+    </div>
+    <div class="mbody">
+      <div class="mart" ${t ? `data-act="mini-off" title="full player"` : ""}>${t ? art(t.thumb, t.title) : `<div class="mlogo">abyss</div>`}</div>
+      <div class="mright">
+        <div class="lcd">
+          <div class="lrow">
+            <span class="lstate">${S.playing ? "▶" : t ? "❚❚" : "■"}</span>
+            <span class="ltime" data-act="mrem" title="elapsed / remaining">${S.miniRemain ? "-" : ""}<b data-bind="${S.miniRemain ? "rem" : "pos"}">${fmt(S.miniRemain ? Math.max(0, S.dur - S.pos) : S.pos) || "0:00"}</b></span>
+            <div class="ltags"><span>src <b>yt</b></span><span>vol <b data-bind="volnum">${Math.round(S.vol * 100)}</b></span><span>${pos}</span>
+              <span class="${S.shuffle ? "lit" : ""}">shuf</span><span class="${S.repeat ? "lit" : ""}">${S.repeat === "one" ? "rep1" : "rep"}</span>
+              ${S.upd?.latest?.newer ? `<span class="lit blink" data-act="mini-upd" title="abyss ${esc(S.upd.latest.version)} is out — click to see it">upd</span>` : ""}
+              ${S.news.some(x => !S.seenNews.has(x.id)) ? `<span class="lit blink" data-act="mini-off" title="there's news — open the full player">news</span>` : ""}</div>
+            <div class="spec" data-spec>${spec}</div>
+          </div>
+          <div class="marq" title="${t ? esc(t.title) : ""}"><div style="animation-duration:${speed}s"><span>${esc(text)}</span><span>${esc(text)}</span></div></div>
+        </div>
+        <div class="mseek">${t ? `<div class="wave" data-wave data-act="seek">${wave(52, hash(t.id))}</div>` : `<div class="wave"></div>`}</div>
+        <div class="mctl">
+          <button data-act="prev" title="previous">${I.prev}</button>
+          <button class="big" data-act="toggle" title="play / pause (space)">${S.playing ? I.pause : I.play}</button>
+          <button data-act="stop" title="stop">${I.stop}</button>
+          <button data-act="next" title="next">${I.next}</button>
+          <div class="mvol volseg" data-drag="volh" title="volume (↑ / ↓)">${Array.from({ length: 16 }, (_, i) => `<i style="height:${30 + (70 * i) / 15}%"></i>`).join("")}</div>
+        </div>
+        <div class="mbtns">
+          <button class="${S.shuffle ? "on" : ""}" data-act="shuffle" title="shuffle">${I.shuffle}</button>
+          <button class="${S.repeat ? "on" : ""}" data-act="repeat" title="repeat">${I.repeat}</button>
+          ${t ? `<button class="${S.liked.has(t.id) ? "on" : ""}" data-act="like" data-id="${esc(t.id)}" title="like">${S.liked.has(t.id) ? I.heartF : I.heart}</button>` : ""}
+          <span class="mfill"></span>
+          <button class="txt ${S.miniPL ? "on" : ""}" data-act="mpl" title="playlist">pl</button>
+          <button class="txt" data-act="theme-next" title="next skin (t)">sk</button>
+        </div>
+      </div>
+    </div>
+    ${S.miniPL ? `<div class="mpl"><div class="mplh"><span class="mgrip"></span><span>playlist editor</span><span class="mgrip"></span></div>
+      <div class="mlist">${reg("queue", S.queue) && S.queue.map((x, i) => `<div class="mrow ${i === S.idx ? "cur" : ""}" data-act="play" data-k="queue" data-i="${i}"><span class="n">${i + 1}.</span><span class="tt">${esc((x.artist ? x.artist + " - " : "") + x.title)}</span><span class="d">${fmt(x.dur) || ""}</span></div>`).join("") || `<div class="mrow"><span class="tt">the queue is empty — play something in the full player.</span></div>`}</div>
+      <div class="mplf"><span>time ${totalTime(S.queue)}</span><span>${pl(S.queue.length, "song")}</span><button data-act="mini-off">full player</button></div></div>` : ""}
+  </div>`;
+}
+
+/* spectrum: youtube's player doesn't share its audio, so this is a lively decoration that follows play / pause */
+let specVals = new Array(22).fill(0), specT = null;
+function specLoop() {
+  const bars = document.querySelectorAll("[data-spec] i");
+  if (!S.mini || !bars.length) { clearInterval(specT); specT = null; return; }
+  const n = bars.length, now = Date.now() / 1000;
+  for (let i = 0; i < n; i++) {
+    const target = S.playing && !S.buffering ? Math.max(0.08, Math.min(1, 0.55 + 0.35 * Math.sin(now * (2.1 + i * 0.37) + i) * Math.cos(now * 1.3 + i * 0.6) + (Math.random() - 0.5) * 0.45 - i / (n * 2.2))) : 0;
+    specVals[i] = target > specVals[i] ? target : specVals[i] * 0.82;
+    bars[i].style.height = Math.round(specVals[i] * 100) + "%";
+  }
+}
+const startSpec = () => { if (!specT) specT = setInterval(specLoop, 70); };
+
+// title bar: drag the window, double-click for the full player
+document.addEventListener("mousedown", e => {
+  if (!S.mini || e.button !== 0) return;
+  const bar = e.target.closest(".mtitle, .mplh");
+  if (bar && !e.target.closest("button")) { e.preventDefault(); winMsg("drag"); }
+});
+document.addEventListener("dblclick", e => { if (S.mini && e.target.closest(".mtitle") && !e.target.closest("button")) setMini(false); });
+// remaining time ticks with the clock
+setInterval(() => { if (S.mini && S.miniRemain) document.querySelectorAll('[data-bind="rem"]').forEach(x => (x.textContent = fmt(Math.max(0, S.dur - S.pos)) || "0:00")); }, 500);
+// started in mini mode: tell the window (it already is mini, this syncs "on top")
+if (S.mini) setTimeout(() => winMsg("mode:" + JSON.stringify(miniSize())), 50);
+
 /* ================= render ================= */
 const root = document.getElementById("root");
 function applyLook() {
@@ -907,6 +1008,14 @@ function render(reset) {
   document.body.dataset.theme = S.theme;
   document.body.classList.toggle("gray", !!S.gray);
   applyLook();
+  document.body.classList.toggle("mini-on", !!S.mini);
+  if (S.mini) {
+    const ml = document.querySelector(".mpl .mlist"), mst = ml ? ml.scrollTop : null;
+    root.innerHTML = miniView();
+    if (mst !== null) { const nl = document.querySelector(".mpl .mlist"); if (nl) nl.scrollTop = mst; }
+    updateVol(); tick(true); placeYT(); startSpec();
+    return;
+  }
   root.innerHTML = `<div class="ab ${S.playing ? "playing" : "paused"}">${topbar()}
     <div class="body">${nowPanel()}<main class="main ${S.page === "np" ? "flush" : ""}">${S.page === "np" ? "" : newsBar()}${(P[S.page] || P.home)()}</main></div>${modal()}</div>`;
   const nm = document.querySelector(".main"); if (nm) nm.scrollTop = st;
@@ -920,13 +1029,18 @@ function render(reset) {
 }
 /* keep the (persistent) youtube player sitting exactly on the cover sleeve in the now playing panel */
 function placeYT() {
-  const w = document.getElementById("ytwrap"), slot = document.querySelector(".np .sleeve");
+  const w = document.getElementById("ytwrap"), slot = document.querySelector(S.mini ? ".mini .mart" : ".np .sleeve");
   if (!w) return;
   if (!slot || !cur()) { w.style.display = "none"; return; }
   const r = slot.getBoundingClientRect();
   Object.assign(w.style, { display: "block", left: r.left + "px", top: r.top + "px", width: r.width + "px", height: r.height + "px" });
 }
 window.addEventListener("resize", () => placeYT());
+// follow the cover when anything scrolls or the layout shifts (narrow / short windows)
+let ytRaf = 0;
+const placeSoon = () => { if (!ytRaf) ytRaf = requestAnimationFrame(() => { ytRaf = 0; placeYT(); }); };
+document.addEventListener("scroll", placeSoon, true);
+new ResizeObserver(placeSoon).observe(document.body);
 let lastLi = -1;
 function tick(force) {
   document.querySelectorAll('[data-bind="pos"]').forEach(e => (e.textContent = fmt(S.pos) || "0:00"));
@@ -1155,6 +1269,17 @@ document.addEventListener("click", async e => {
     }
     case "dl": { const t = S.queue.find(x => x.id === d.id) || cur(); if (t) queueDownload([t], t.title, "song"); return; }
     case "dlcancel": await window.api.dlCancel(+d.id); return;
+    case "mini-on": return setMini(true);
+    case "mini-off": return setMini(false);
+    case "mini-upd": setMini(false); S.modal = "upd"; return render();
+    case "mmin": return winMsg("minimize");
+    case "mclose": return winMsg("close");
+    case "mpl": S.miniPL = !S.miniPL; store.set("miniPL", S.miniPL); winMsg("mode:" + JSON.stringify(miniSize())); render(); return setTimeout(scrollPL, 30);
+    case "minitop":
+    case "mpin": S.miniTop = !S.miniTop; store.set("miniTop", S.miniTop); winMsg("mode:" + JSON.stringify(miniSize())); return render();
+    case "mrem": S.miniRemain = !S.miniRemain; return render();
+    case "stop": audio.pause(); audio.currentTime = 0; S.pos = 0; return render();
+    case "theme-next": { const i = THEMES.findIndex(x => x[0] === S.theme), n = THEMES[(i + 1) % THEMES.length]; S.theme = n[0]; store.set("theme", S.theme); render(); return toast((SKINS[S.theme] || SKINS.cream)[1]); }
     case "upd-show": S.modal = "upd"; return render();
     case "upd-later": S.updLater = true; return render();
     case "upd-check": { toast("checking for updates…"); try { const st = await window.api.updateCheck(); S.upd = st; toast(st.latest?.newer ? `abyss ${st.latest.version} is available` : "you're on the latest version"); } catch (err) { toast(err.message); } window.api.newsRefresh().then(l => window.__abyssNews(l)).catch(() => {}); return render(); }
@@ -1332,6 +1457,7 @@ document.addEventListener("keydown", e => {
   else if (e.key === "ArrowLeft") audio.currentTime = Math.max(0, audio.currentTime - 5);
   else if (e.key === "ArrowUp") { e.preventDefault(); setVol(S.vol + 0.05); toast(`volume ${Math.round(S.vol * 100)}`); }
   else if (e.key === "ArrowDown") { e.preventDefault(); setVol(S.vol - 0.05); toast(`volume ${Math.round(S.vol * 100)}`); }
+  else if (e.key.toLowerCase() === "m" && e.ctrlKey) { e.preventDefault(); setMini(!S.mini); }
   else if (e.key === "m") { if (S.vol > 0) { S.prevVol = S.vol; setVol(0); toast("muted"); } else { setVol(S.prevVol || 0.7); toast("unmuted"); } }
   else if (e.key === "l") { if (S.page === "np" && S.tab === "lyrics") go("home"); else { S.tab = "lyrics"; go("np"); } }
   else if (e.key === "t") { const i = THEMES.findIndex(t => t[0] === S.theme), n = THEMES[(i + 1) % THEMES.length]; S.theme = n[0]; store.set("theme", S.theme); render(); toast(n[1].toLowerCase()); }

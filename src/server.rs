@@ -19,7 +19,7 @@ const EXTRA_CSS: &str = include_str!("../ui/extra.css");
 const YTPLAYER_JS: &str = include_str!("../ui/ytplayer.js");
 const SHIM_JS: &str = include_str!("../ui/shim.js");
 const INDEX: &str = include_str!("../ui/index.html");
-const FONTS_URL: &str = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Pixelify+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Bungee&family=Anton&family=Orbitron:wght@600;800&family=Playfair+Display:ital,wght@0,700;0,800;1,700&family=VT323&family=Fredoka:wght@500;600;700&display=swap";
+const FONTS_URL: &str = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Pixelify+Sans:wght@400;500;600;700&family=Space+Mono:wght@400;700&family=Bungee&family=Anton&family=Orbitron:wght@600;800&family=Playfair+Display:ital,wght@0,700;0,800;1,700&family=VT323&family=Fredoka:wght@500;600;700&family=Silkscreen:wght@400;700&display=swap";
 
 fn index() -> &'static str {
     static I: OnceLock<String> = OnceLock::new();
@@ -146,7 +146,9 @@ fn font_dir() -> std::path::PathBuf {
     util::local_dir().join("fonts")
 }
 async fn fonts_css(app: &App) -> Response {
-    let f = font_dir().join("fonts.css");
+    // the file name follows the font list, so adding a font refreshes the cache
+    let tag = FONTS_URL.bytes().fold(5381u32, |h, b| h.wrapping_mul(33) ^ b as u32);
+    let f = font_dir().join(format!("fonts-{tag:08x}.css"));
     if let Ok(b) = tokio::fs::read(&f).await {
         return resp(CSS, b, "no-cache");
     }

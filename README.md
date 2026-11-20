@@ -43,6 +43,7 @@ Synced lyrics with romaji · 7 themes · 10 fonts · Discord status · offline d
 | 🎧 **Only music** | Playlists hide videos that aren't music (tutorials, vlogs…) and tell you how many |
 | ⬇️ **Downloads** | Songs, albums or whole playlists, with a live progress panel |
 | 🎨 **Themes & fonts** | White, dark, cream & blue, vice sunset, latte, sakura, or your own colors. Any font with any theme |
+| 📻 **Mini player** | Winamp / AIMP style, a skin for every theme, always on top. <kbd>ctrl</kbd>+<kbd>m</kbd> |
 | 🌊 **Smooth transitions** | Crossfade 2 to 12 s between songs, plus playback speed |
 | 💬 **Discord** | Shows *Listening to abyss* with the song, cover and time |
 | 🔄 **Updates itself** | New versions are found, checked (SHA-256) and installed for you |
@@ -61,6 +62,12 @@ Synced lyrics with romaji · 7 themes · 10 fonts · Discord status · offline d
 <td><img src="docs/screenshots/album.png" alt="Gawr Gura single, latte theme"><br><sub><b>Album</b>: Gawr Gura · latte</sub></td>
 </tr>
 </table>
+
+<details open>
+<summary><b>Mini player</b>: old-school skins, one per theme (<kbd>ctrl</kbd>+<kbd>m</kbd>)</summary>
+<br>
+<img src="docs/screenshots/mini.png" alt="the mini player in six skins with the playlist editor open">
+</details>
 
 <details>
 <summary><b>Themes</b> (7, including your own colors)</summary>
@@ -152,6 +159,7 @@ The AppImage uses the WebKitGTK installed on your system (see the package names 
 | <kbd>l</kbd> | lyrics |
 | <kbd>t</kbd> | next theme |
 | <kbd>ctrl</kbd> + <kbd>f</kbd> | search |
+| <kbd>ctrl</kbd> + <kbd>m</kbd> | mini player ↔ full player |
 
 ## Updates & announcements
 

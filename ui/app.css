@@ -234,18 +234,12 @@ input[type=range] { accent-color: var(--fg); width: 100%; cursor: pointer; }
 .modal .r { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
 
 /* ===== responsive ===== */
+/* medium: two columns, slimmer now-playing panel; search drops to its own row */
 @media (max-width: 1100px) {
-  .top { flex-wrap: wrap; gap: 12px 18px; padding: 12px 18px; }
+  .top { flex-wrap: wrap; gap: 10px 18px; padding: 12px 18px; }
   .srch { order: 5; flex-basis: 100%; max-width: none; margin: 0; }
-  .body { grid-template-columns: 1fr; overflow-y: auto; }
-  .np { border-right: 0; border-bottom: 2px solid var(--ink); overflow: visible; }
-  .main { overflow: visible; padding: 22px 18px 50px; }
-  .main.flush { overflow: visible; height: 80vh; }
+  .body { grid-template-columns: minmax(290px, 34vw) minmax(0, 1fr); }
+  .main { padding: 22px 20px 50px; }
   .h1 { font-size: 48px; }
   .dhead { flex-direction: column; align-items: flex-start; }
-}
-@media (max-width: 640px) {
-  .nav { gap: 14px; font-size: 13px; } .top-r .obtn span.t { display: none; }
-  .themes { grid-template-columns: 1fr; }
-  .row .du, .row [data-act="addq"] { display: none; }
 }
