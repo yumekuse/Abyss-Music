@@ -2,6 +2,18 @@
   "_help": "Announcements shown inside abyss. Edit this file and push to main: every running app picks it up within 3 hours (or when someone presses 'check for updates'). Fields: id (unique, required), title, body, level (info | update | warning | important), link {label, url (https only)}, date, start / end (YYYY-MM-DD), minVersion / maxVersion, platforms ([\"windows\", \"linux\"]), dismissible (default true). See README → Announcements.",
   "announcements": [
     {
+      "id": "test-2-2026-11-20",
+      "level": "update",
+      "title": "second test ✦ with a button",
+      "body": "this one has a link button. press it to open the abyss page on github.",
+      "link": {
+        "label": "open github",
+        "url": "https://github.com/yumekuse/Abyss-Music"
+      },
+      "date": "2026-11-20",
+      "end": "2026-11-21"
+    },
+    {
       "id": "test-2026-11-20",
       "level": "important",
       "title": "test announcement ♪",
