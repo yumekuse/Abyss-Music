@@ -903,11 +903,40 @@ Object.assign(I, {
   stop: sv('<rect x="6" y="6" width="12" height="12"/>', 1),
   winMin: sv('<path d="M6 17h12"/>'), winFull: sv('<rect x="5" y="5" width="14" height="14"/>'), pin: sv('<path d="M12 17v5M8 3h8l-1 6 3 4H6l3-4z"/>'),
 });
-S.mini = store.get("mini", false); S.miniPL = store.get("miniPL", false); S.miniTop = store.get("miniTop", true); S.miniRemain = false;
+S.mini = store.get("mini", false); S.miniPanel = store.get("miniPanel", store.get("miniPL", false) ? "pl" : null);
+S.mq = ""; S.mres = { state: "idle", items: [] }; S.miniTop = store.get("miniTop", true); S.miniRemain = false;
 // skin per theme: cream = aimp modern, dark = classic winamp, vice = red winamp, sakura = pink, latte = bronze, white = silver lcd
 const SKINS = { cream: ["aimp", "abyss modern"], dark: ["winamp", "abyss classic"], vice: ["vice", "abyss inferno"], sakura: ["sakura", "abyss sakura"], latte: ["latte", "abyss bronze"], white: ["silver", "abyss silver"], custom: ["custom", "abyss custom"] };
 const winMsg = m => { try { window.ipc && window.ipc.postMessage(m); } catch {} };
-const miniSize = () => ({ mini: S.mini, w: MINI_W, h: S.miniPL ? MINI_H_PL : MINI_H, onTop: S.miniTop });
+const miniSize = () => ({ mini: S.mini, w: MINI_W, h: S.miniPanel ? MINI_H_PL : MINI_H, onTop: S.miniTop });
+function miniPanel(p) {
+  S.miniPanel = S.miniPanel === p ? null : p;
+  store.set("miniPanel", S.miniPanel); store.set("miniPL", !!S.miniPanel); // miniPL: the window opens tall next time
+  winMsg("mode:" + JSON.stringify(miniSize()));
+  render();
+  if (S.miniPanel === "pl") setTimeout(scrollPL, 30);
+  if (S.miniPanel === "sr") setTimeout(() => document.getElementById("mq")?.focus(), 30);
+}
+async function miniSearch() {
+  const q = S.mq.trim();
+  if (!q) return;
+  S.mres = { state: "loading", q, items: [] }; render();
+  try {
+    const res = await window.api.search(q);
+    const songs = res.find(x => x.kind === "song")?.items || [], vids = res.find(x => x.kind === "video")?.items || [];
+    S.mres = { state: "ok", q, items: [...songs, ...vids.slice(0, 8)].filter(t => t.type === "song") };
+  } catch (err) { S.mres = { state: "err", q, items: [], e: err.message }; }
+  render();
+}
+// put songs from mini search into the queue: "now" | "next" | "end"
+function miniQueue(t, where) {
+  if (!t) return;
+  const item = { ...t };
+  if (!cur()) { S.queue = [item]; S.idx = 0; S.qKey = "queue"; S.qName = "your queue"; load(); return toast(`playing “${t.title}”`); }
+  if (where === "end") { S.queue.push(item); toast(`added “${t.title}”`); }
+  else { S.queue.splice(S.idx + 1, 0, item); if (where === "now") { S.idx++; load(); } else toast(`“${t.title}” plays next`); }
+  saveSession(); render();
+}
 function setMini(on) {
   S.mini = !!on; store.set("mini", S.mini);
   winMsg("mode:" + JSON.stringify(miniSize()));
@@ -956,15 +985,37 @@ function miniView() {
           <button class="${S.repeat ? "on" : ""}" data-act="repeat" title="repeat">${I.repeat}</button>
           ${t ? `<button class="${S.liked.has(t.id) ? "on" : ""}" data-act="like" data-id="${esc(t.id)}" title="like">${S.liked.has(t.id) ? I.heartF : I.heart}</button>` : ""}
           <span class="mfill"></span>
-          <button class="txt ${S.miniPL ? "on" : ""}" data-act="mpl" title="playlist">pl</button>
+          <button class="txt ${S.miniPanel === "sr" ? "on" : ""}" data-act="mpanel" data-p="sr" title="search & add songs">sr</button>
+          <button class="txt ${S.miniPanel === "pl" ? "on" : ""}" data-act="mpanel" data-p="pl" title="playlist">pl</button>
           <button class="txt" data-act="theme-next" title="next skin (t)">sk</button>
         </div>
       </div>
     </div>
-    ${S.miniPL ? `<div class="mpl"><div class="mplh"><span class="mgrip"></span><span>playlist editor</span><span class="mgrip"></span></div>
-      <div class="mlist">${reg("queue", S.queue) && S.queue.map((x, i) => `<div class="mrow ${i === S.idx ? "cur" : ""}" data-act="play" data-k="queue" data-i="${i}"><span class="n">${i + 1}.</span><span class="tt">${esc((x.artist ? x.artist + " - " : "") + x.title)}</span><span class="d">${fmt(x.dur) || ""}</span></div>`).join("") || `<div class="mrow"><span class="tt">the queue is empty — play something in the full player.</span></div>`}</div>
-      <div class="mplf"><span>time ${totalTime(S.queue)}</span><span>${pl(S.queue.length, "song")}</span><button data-act="mini-off">full player</button></div></div>` : ""}
+    ${S.miniPanel === "pl" ? miniPL() : S.miniPanel === "sr" ? miniSR() : ""}
   </div>`;
+}
+
+function miniPL() {
+  const rows = S.queue.map((x, i) => `<div class="mrow ${i === S.idx ? "cur" : ""}" draggable="true" data-qi="${i}" data-act="play" data-k="queue" data-i="${i}" title="click to play · drag to move">
+      <span class="n">${i + 1}.</span><span class="tt">${esc((x.artist ? x.artist + " - " : "") + x.title)}</span><span class="d">${fmt(x.dur) || ""}</span>
+      <span class="ma"><button data-act="mup" data-i="${i}" title="move up">▲</button><button data-act="mdown" data-i="${i}" title="move down">▼</button><button data-act="rmq" data-i="${i}" title="remove">✕</button></span></div>`).join("");
+  return `<div class="mpl"><div class="mplh"><span class="mgrip"></span><span>playlist editor</span><span class="mgrip"></span></div>
+    <div class="mlist">${reg("queue", S.queue) && rows || `<div class="mrow"><span class="tt">the queue is empty — press SR to find songs.</span></div>`}</div>
+    <div class="mplf"><span>time ${totalTime(S.queue)}</span><span>${pl(S.queue.length, "song")}</span><button data-act="clearq" title="keep only the song that's playing">clear</button><button data-act="mpanel" data-p="sr">+ add</button></div></div>`;
+}
+function miniSR() {
+  const r = S.mres, list = r.items || [];
+  const body = r.state === "loading" ? `<div class="mrow"><span class="tt">searching “${esc(r.q)}”…</span></div>`
+    : r.state === "err" ? `<div class="mrow"><span class="tt">${esc(r.e || "search failed")}</span></div>`
+    : r.state === "ok" && !list.length ? `<div class="mrow"><span class="tt">nothing found for “${esc(r.q)}”.</span></div>`
+    : r.state === "idle" ? `<div class="mrow"><span class="tt">type a song or artist and press enter.</span></div>`
+    : reg("msr", list) && list.map((x, i) => `<div class="mrow ${cur()?.id === x.id ? "cur" : ""}" data-act="mplay" data-i="${i}" title="double-click to play">
+        <span class="n">${x.video ? "▶" : "♪"}</span><span class="tt">${esc((x.artist ? x.artist + " - " : "") + x.title)}</span><span class="d">${fmt(x.dur) || ""}</span>
+        <span class="ma show"><button data-act="mplay" data-i="${i}" title="play now">▶</button><button data-act="mnext" data-i="${i}" title="play next">⤵</button><button data-act="madd" data-i="${i}" title="add to the end of the queue">+</button></span></div>`).join("");
+  return `<div class="mpl msr"><div class="mplh"><span class="mgrip"></span><span>search</span><span class="mgrip"></span></div>
+    <div class="msbox"><input id="mq" value="${esc(S.mq)}" placeholder="search songs, artists…" spellcheck="false" autocomplete="off"><button data-act="mq-go">go</button></div>
+    <div class="mlist">${body}</div>
+    <div class="mplf"><span>${r.state === "ok" ? pl(list.length, "result") : "▶ play · ⤵ next · + queue"}</span><span>queue ${S.queue.length}</span><button data-act="mpanel" data-p="pl">playlist</button></div></div>`;
 }
 
 /* spectrum: youtube's player doesn't share its audio, so this is a lively decoration that follows play / pause */
@@ -1274,7 +1325,18 @@ document.addEventListener("click", async e => {
     case "mini-upd": setMini(false); S.modal = "upd"; return render();
     case "mmin": return winMsg("minimize");
     case "mclose": return winMsg("close");
-    case "mpl": S.miniPL = !S.miniPL; store.set("miniPL", S.miniPL); winMsg("mode:" + JSON.stringify(miniSize())); render(); return setTimeout(scrollPL, 30);
+    case "mpl": return miniPanel("pl");
+    case "mpanel": return miniPanel(d.p);
+    case "mq-go": S.mq = document.getElementById("mq")?.value || S.mq; return miniSearch();
+    case "mplay": if (e.detail < 2 && a.classList.contains("mrow")) return; return miniQueue(listFor("msr")[+d.i], "now");
+    case "mnext": return miniQueue(listFor("msr")[+d.i], "next");
+    case "madd": return miniQueue(listFor("msr")[+d.i], "end");
+    case "mup": case "mdown": {
+      const i = +d.i, j = d.act === "mup" ? i - 1 : i + 1;
+      if (j < 0 || j >= S.queue.length) return;
+      const ct = cur(); [S.queue[i], S.queue[j]] = [S.queue[j], S.queue[i]]; S.idx = S.queue.indexOf(ct);
+      saveSession(); return render();
+    }
     case "minitop":
     case "mpin": S.miniTop = !S.miniTop; store.set("miniTop", S.miniTop); winMsg("mode:" + JSON.stringify(miniSize())); return render();
     case "mrem": S.miniRemain = !S.miniRemain; return render();
@@ -1449,6 +1511,7 @@ document.addEventListener("input", e => {
 document.addEventListener("change", e => { if (e.target.dataset.band || e.target.dataset.cc) render(); });
 document.addEventListener("keydown", e => {
   if (e.target.id === "tbq" && e.key === "Enter") { clearTimeout(qT); const q = S.q.trim(); if (q) go("search", { q }); return; }
+  if (e.target.id === "mq" && e.key === "Enter") { S.mq = e.target.value; miniSearch(); return; }
   if (e.target.id === "plname" && e.key === "Enter") return document.querySelector('[data-act="newpl-ok"]')?.click();
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "f") { e.preventDefault(); const i = document.getElementById("tbq"); i?.focus(); i?.select(); return; }
   if (["INPUT", "TEXTAREA"].includes(e.target.tagName)) { if (e.key === "Escape") e.target.blur(); return; }
@@ -1467,7 +1530,7 @@ document.addEventListener("keydown", e => {
 /* queue drag & drop */
 let dragQi = null;
 document.addEventListener("dragstart", e => { const r = e.target.closest("[data-qi]"); if (r) { dragQi = +r.dataset.qi; e.dataTransfer.effectAllowed = "move"; } });
-document.addEventListener("dragover", e => { const r = e.target.closest("[data-qi]"); if (r && dragQi !== null) { e.preventDefault(); document.querySelectorAll(".row.over").forEach(x => x.classList.remove("over")); r.classList.add("over"); } });
+document.addEventListener("dragover", e => { const r = e.target.closest("[data-qi]"); if (r && dragQi !== null) { e.preventDefault(); document.querySelectorAll(".over").forEach(x => x.classList.remove("over")); r.classList.add("over"); } });
 document.addEventListener("drop", e => {
   const r = e.target.closest("[data-qi]");
   if (!r || dragQi === null) return;
@@ -1476,7 +1539,8 @@ document.addEventListener("drop", e => {
   const [m] = S.queue.splice(dragQi, 1); S.queue.splice(to, 0, m);
   S.idx = S.queue.indexOf(curT); dragQi = null; render();
 });
-document.addEventListener("dragend", () => { dragQi = null; document.querySelectorAll(".row.over").forEach(x => x.classList.remove("over")); });
+document.addEventListener("dragend", () => { dragQi = null; document.querySelectorAll(".over").forEach(x => x.classList.remove("over")); });
+document.addEventListener("input", e => { if (e.target.id === "mq") S.mq = e.target.value; });
 
 /* ================= boot ================= */
 restoreSession();
