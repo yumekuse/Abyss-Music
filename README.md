@@ -43,7 +43,7 @@ Synced lyrics with romaji · 7 themes · 10 fonts · Discord status · offline d
 | 🎧 **Only music** | Playlists hide videos that aren't music (tutorials, vlogs…) and tell you how many |
 | ⬇️ **Downloads** | Songs, albums or whole playlists, with a live progress panel |
 | 🎨 **Themes & fonts** | White, dark, cream & blue, vice sunset, latte, sakura, or your own colors. Any font with any theme |
-| 📻 **Mini player** | Winamp / AIMP style, a skin for every theme, always on top. <kbd>ctrl</kbd>+<kbd>m</kbd> |
+| 📻 **Mini player** | Winamp / AIMP style, a skin for every theme, always on top, with its own search and playlist editor. <kbd>ctrl</kbd>+<kbd>m</kbd> |
 | 🌊 **Smooth transitions** | Crossfade 2 to 12 s between songs, plus playback speed |
 | 💬 **Discord** | Shows *Listening to abyss* with the song, cover and time |
 | 🔄 **Updates itself** | New versions are found, checked (SHA-256) and installed for you |

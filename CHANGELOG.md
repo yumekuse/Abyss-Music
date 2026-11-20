@@ -2,6 +2,11 @@
 
 Each `## <version>` section becomes the release notes for that version and shows up in the app's "what's new" window.
 
+## 0.3.1
+- **Search in the mini player:** the new **SR** button opens a search panel. Find any song and **play it now**, **play it next**, or **add it to the end of the queue**, without leaving the mini player.
+- **Editable playlist in the mini player:** move songs up / down or drag them, remove them, or **clear** the queue.
+- Small "added …" messages now show in the mini player too.
+
 ## 0.3.0
 - **Mini player:** a small old-school player in the style of Winamp / AIMP, with a skin for every theme (silver-blue modern, classic black & green, red inferno, pink sakura, bronze, green-LCD silver, or your own colors). Glowing LCD clock, scrolling title, spectrum bars, LED seek bar, and a playlist editor (PL). It stays on top of other windows and remembers where you put it. Open it with the new button in the top bar or **ctrl+m**.
 - **Small windows work now:** at medium sizes the layout keeps two columns; when narrow, now playing becomes a compact strip on top. The player no longer floats over the page.
