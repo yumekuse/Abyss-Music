@@ -1,0 +1,14 @@
+{
+  "_help": "Announcements shown inside abyss. Edit this file and push to main: every running app picks it up within 3 hours (or when someone presses 'check for updates'). Fields: id (unique, required), title, body, level (info | update | warning | important), link {label, url (https only)}, date, start / end (YYYY-MM-DD), minVersion / maxVersion, platforms ([\"windows\", \"linux\"]), dismissible (default true). See README → Announcements.",
+  "announcements": [
+    {
+      "id": "welcome-0.2",
+      "level": "info",
+      "title": "welcome to abyss 0.2 ✦",
+      "body": "abyss is now open source and rebuilt from scratch in Rust: it opens in under a second, and updates install themselves.\nfound a bug or have an idea? tell us on github.",
+      "link": { "label": "open github", "url": "https://github.com/yumekuse/Abyss-Music" },
+      "date": "2026-11-20",
+      "end": "2027-01-31"
+    }
+  ]
+}

@@ -1,0 +1,127 @@
+name: build
+
+# every push / pull request: build + test on Windows and Linux
+# a tag like v0.3.0: also publish a GitHub release with all the packages (the app's auto-update reads it)
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Test
+        run: cargo test --release
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+      - name: Build app + installer
+        shell: pwsh
+        run: ./installer/build.ps1
+      - name: Portable zip
+        shell: pwsh
+        run: |
+          $v = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
+          New-Item -ItemType Directory -Force out | Out-Null
+          Copy-Item "dist/abyss-setup-$v.exe" out/
+          Compress-Archive -Path target/release/abyss.exe, LICENSE -DestinationPath "out/abyss-$v-windows-x64-portable.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: out/*
+
+  linux:
+    runs-on: ubuntu-22.04   # older glibc = runs on more distros
+    steps:
+      - uses: actions/checkout@v4
+      - name: System libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libsoup-3.0-dev pkg-config file
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Test
+        run: cargo test --release
+      - name: Build
+        run: cargo build --release
+      - name: Packages (tar.gz, .deb, AppImage, PKGBUILD)
+        run: |
+          set -e
+          V=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          mkdir -p out
+
+          # tarball for any distro
+          T=abyss-$V-linux-x86_64
+          mkdir -p $T
+          cp target/release/abyss packaging/linux/abyss.desktop packaging/linux/install.sh LICENSE $T/
+          cp assets/icon.png $T/abyss.png
+          chmod +x $T/abyss $T/install.sh
+          tar czf out/$T.tar.gz $T
+
+          # Debian / Ubuntu / Kali
+          cargo install cargo-deb --locked
+          cargo deb --no-build --no-strip -o out/abyss-music_${V}_amd64.deb
+
+          # AppImage (uses the system's WebKitGTK; updates itself)
+          A=AppDir
+          mkdir -p $A/usr/bin $A/usr/share/applications $A/usr/share/icons/hicolor/256x256/apps
+          cp target/release/abyss $A/usr/bin/
+          cp packaging/linux/abyss.desktop $A/ && cp packaging/linux/abyss.desktop $A/usr/share/applications/
+          cp assets/icon.png $A/abyss.png && cp assets/icon.png $A/usr/share/icons/hicolor/256x256/apps/abyss.png
+          ln -s usr/bin/abyss $A/AppRun
+          wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool
+          chmod +x appimagetool
+          ARCH=x86_64 ./appimagetool --appimage-extract-and-run $A out/abyss-$V-x86_64.AppImage
+
+          # Arch / CachyOS PKGBUILD with the real checksum
+          SUM=$(sha256sum out/$T.tar.gz | cut -d' ' -f1)
+          sed -e "s/@VERSION@/$V/" -e "s/@SHA256@/$SUM/" packaging/arch/PKGBUILD.in > out/PKGBUILD
+          ls -la out
+      - name: Check the binary starts its server (headless)
+        run: |
+          sudo apt-get install -y xvfb
+          ABYSS_USERDATA=$(mktemp -d) ABYSS_NO_UPDATE=1 xvfb-run -a ./target/release/abyss &
+          for i in $(seq 1 30); do sleep 1; curl -sf http://127.0.0.1:47811/ping && break; done
+          curl -sf http://127.0.0.1:47811/ping | grep -q abyss
+          echo "linux build starts: window + local server ok"
+          # youtube sometimes blocks datacenter IPs, so this one only warns
+          curl -sf -X POST http://127.0.0.1:47811/api/moods -H 'content-type: application/json' -d '[]' | grep -q '"ok":true' \
+            && echo "youtube api ok" || echo "::warning::youtube api not reachable from the CI runner"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: out/*
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, linux]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: files
+          merge-multiple: true
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          TAG=${GITHUB_REF_NAME}
+          V=${TAG#v}
+          cd files && sha256sum * > SHA256SUMS.txt && cd ..
+          # notes = this version's section of CHANGELOG.md
+          awk -v v="$V" '/^## /{p = ($2 == v)} p' CHANGELOG.md | tail -n +2 > notes.md
+          [ -s notes.md ] || echo "abyss $V" > notes.md
+          gh release create "$TAG" files/* --title "abyss $V" --notes-file notes.md

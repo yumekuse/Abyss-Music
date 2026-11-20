@@ -1,0 +1,25 @@
+# Maintainer: yumekuse <https://github.com/yumekuse>
+# Arch Linux / CachyOS / EndeavourOS / Manjaro.
+# The release workflow fills in the version and checksum and attaches the finished PKGBUILD
+# to every GitHub release:   makepkg -si
+pkgname=abyss-music-bin
+pkgver=@VERSION@
+pkgrel=1
+pkgdesc="Fast, ad-free YouTube Music player: synced lyrics, romaji, themes, Discord status"
+arch=('x86_64')
+url="https://github.com/yumekuse/Abyss-Music"
+license=('MIT')
+depends=('webkit2gtk-4.1' 'gtk3' 'gst-plugins-base' 'gst-plugins-good' 'gst-plugins-bad' 'gst-libav')
+optdepends=('discord: "listening to" status on your profile')
+provides=('abyss-music')
+conflicts=('abyss-music')
+source=("abyss-${pkgver}-linux-x86_64.tar.gz::https://github.com/yumekuse/Abyss-Music/releases/download/v${pkgver}/abyss-${pkgver}-linux-x86_64.tar.gz")
+sha256sums=('@SHA256@')
+
+package() {
+  cd "abyss-${pkgver}-linux-x86_64"
+  install -Dm755 abyss "${pkgdir}/usr/bin/abyss"
+  install -Dm644 abyss.desktop "${pkgdir}/usr/share/applications/abyss.desktop"
+  install -Dm644 abyss.png "${pkgdir}/usr/share/icons/hicolor/256x256/apps/abyss.png"
+  install -Dm644 LICENSE "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=abyss
+GenericName=Music Player
+Comment=Fast, ad-free YouTube Music player
+Exec=abyss
+Icon=abyss
+Terminal=false
+Categories=AudioVideo;Audio;Player;Music;
+Keywords=music;youtube;lyrics;player;vocaloid;
+StartupWMClass=abyss
