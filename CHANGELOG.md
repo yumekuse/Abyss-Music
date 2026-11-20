@@ -2,6 +2,9 @@
 
 Each `## <version>` section becomes the release notes for that version and shows up in the app's "what's new" window.
 
+## 0.2.1
+- Test update: same app as 0.2.0, just a new version number to check that updating works. Nothing else changed.
+
 ## 0.2.0
 - **Rebuilt in Rust.** One ~6 MB app instead of Electron: the window appears in about 0.35 s and home is filled in under a second.
 - **Instant start:** home, your picks, library and likes show right away from the last session, then refresh by themselves.

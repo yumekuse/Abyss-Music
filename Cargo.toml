@@ -1,6 +1,6 @@
 ﻿[package]
 name = "abyss"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 description = "abyss - a fast, ad-free YouTube Music player for your desktop"
 license = "MIT"

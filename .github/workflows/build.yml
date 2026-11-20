@@ -6,6 +6,8 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
+    # editing only these doesn't rebuild the app (tags always build)
+    paths-ignore: ["announcements.json", "**.md", "docs/**"]
   pull_request:
   workflow_dispatch:
 
@@ -124,9 +126,15 @@ jobs:
           # notes = this version's section of CHANGELOG.md
           awk -v v="$V" '/^## /{p = ($2 == v)} p' CHANGELOG.md | tail -n +2 > notes.md
           [ -s notes.md ] || echo "abyss $V" > notes.md
-          # if the release was already made by hand, just add / replace the files on it
+          # if the release was already made by hand: only add the files it doesn't have yet
+          # (never replace an uploaded installer while people may be downloading it)
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" files/* --clobber
+            have=$(gh release view "$TAG" --json assets -q '.assets[].name')
+            for f in files/*; do
+              n=$(basename "$f")
+              [ "$n" = "SHA256SUMS.txt" ] && continue
+              echo "$have" | grep -qxF "$n" || gh release upload "$TAG" "$f"
+            done
           else
             gh release create "$TAG" files/* --title "abyss $V" --notes-file notes.md
           fi
