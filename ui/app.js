@@ -901,6 +901,7 @@ const MINI_W = 520, MINI_H = 244, MINI_H_PL = 500;
 Object.assign(I, {
   mini: sv('<rect x="3" y="5" width="18" height="14" rx="1"/><rect x="12" y="11" width="7" height="6" class="f"/>'),
   stop: sv('<rect x="6" y="6" width="12" height="12"/>', 1),
+  playNext: '<svg viewBox="0 0 24 24"><path d="M3 6h11M3 12h7M3 18h11" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M14 9.5v9l7-4.5z" fill="currentColor"/></svg>',
   winMin: sv('<path d="M6 17h12"/>'), winFull: sv('<rect x="5" y="5" width="14" height="14"/>'), pin: sv('<path d="M12 17v5M8 3h8l-1 6 3 4H6l3-4z"/>'),
 });
 S.mini = store.get("mini", false); S.miniPanel = store.get("miniPanel", store.get("miniPL", false) ? "pl" : null);
@@ -1011,11 +1012,11 @@ function miniSR() {
     : r.state === "idle" ? `<div class="mrow"><span class="tt">type a song or artist and press enter.</span></div>`
     : reg("msr", list) && list.map((x, i) => `<div class="mrow ${cur()?.id === x.id ? "cur" : ""}" data-act="mplay" data-i="${i}" title="double-click to play">
         <span class="n">${x.video ? "▶" : "♪"}</span><span class="tt">${esc((x.artist ? x.artist + " - " : "") + x.title)}</span><span class="d">${fmt(x.dur) || ""}</span>
-        <span class="ma show"><button data-act="mplay" data-i="${i}" title="play now">▶</button><button data-act="mnext" data-i="${i}" title="play next">⤵</button><button data-act="madd" data-i="${i}" title="add to the end of the queue">+</button></span></div>`).join("");
+        <span class="ma show"><button data-act="mplay" data-i="${i}" title="play now">▶</button><button data-act="mnext" data-i="${i}" title="play next">${I.playNext}</button><button data-act="madd" data-i="${i}" title="add to the end of the queue">+</button></span></div>`).join("");
   return `<div class="mpl msr"><div class="mplh"><span class="mgrip"></span><span>search</span><span class="mgrip"></span></div>
     <div class="msbox"><input id="mq" value="${esc(S.mq)}" placeholder="search songs, artists…" spellcheck="false" autocomplete="off"><button data-act="mq-go">go</button></div>
     <div class="mlist">${body}</div>
-    <div class="mplf"><span>${r.state === "ok" ? pl(list.length, "result") : "▶ play · ⤵ next · + queue"}</span><span>queue ${S.queue.length}</span><button data-act="mpanel" data-p="pl">playlist</button></div></div>`;
+    <div class="mplf"><span>${r.state === "ok" ? pl(list.length, "result") : "▶ play now · ≡▸ play next · + add to queue"}</span><span>queue ${S.queue.length}</span><button data-act="mpanel" data-p="pl">playlist</button></div></div>`;
 }
 
 /* spectrum: youtube's player doesn't share its audio, so this is a lively decoration that follows play / pause */
